@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using Repository;
 using Service;
 using Service.Contracts;
@@ -42,19 +43,21 @@ public static class ServiceExtensions
             throw new InvalidOperationException("The DATABASE_URL environment variable is not set.");
         }
 
-        var connectionString = ConvertDatabaseUrlToConnectionString(databaseUrl);
-
-        services.AddDbContext<RepositoryContext>(opts =>
-            opts.UseNpgsql(connectionString));
-    }
-
-    private static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
-    {
         var uri = new Uri(databaseUrl);
         var userInfo = uri.UserInfo.Split(':');
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port,
+            Username = userInfo[0],
+            Password = userInfo[1],
+            Database = uri.LocalPath.TrimStart('/'),
+            SslMode = SslMode.Require
+        };
 
-        return
-            $"Host={uri.Host};Port={uri.Port},Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode=Require;TrustServerCertificate=True";
+        var connectionString = builder.ToString();
+        services.AddDbContext<RepositoryContext>(opts =>
+            opts.UseNpgsql(connectionString));
     }
 
     public static void ConfigureIdentity(this IServiceCollection services)
