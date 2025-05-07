@@ -36,8 +36,25 @@ public static class ServiceExtensions
 
     public static void ConfigureNpgsqlContext(this IServiceCollection services, IConfiguration configuration)
     {
+        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+        if (string.IsNullOrEmpty(databaseUrl))
+        {
+            throw new InvalidOperationException("The DATABASE_URL environment variable is not set.");
+        }
+
+        var connectionString = ConvertDatabaseUrlToConnectionString(databaseUrl);
+
         services.AddDbContext<RepositoryContext>(opts =>
-            opts.UseNpgsql(configuration.GetConnectionString("PostgresConnection")));
+            opts.UseNpgsql(connectionString));
+    }
+
+    private static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
+    {
+        var uri = new Uri(databaseUrl);
+        var userInfo = uri.UserInfo.Split(':');
+
+        return
+            $"Host={uri.Host};Port={uri.Port},Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode=Require;TrustServerCertificate=True";
     }
 
     public static void ConfigureIdentity(this IServiceCollection services)
